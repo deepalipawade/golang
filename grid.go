@@ -1,14 +1,33 @@
+// package new_sudoku
 package main
 
 import (
+	"database/sql"
+	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
+	"os"
+	"strconv"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 type Sudoku struct {
 	grid  [][]int
+	userGrid [][]int
 	level int
+}
+
+func (s *Sudoku)getStringArray() string {
+	var str string
+	for i := 0; i < 9; i++ {
+		for j := 0; j < 9; j++ {
+			str = str + strconv.Itoa(s.userGrid[i][j])
+		}
+	}
+	return str
 }
 
 func RandomInt(MAX int, MIN int) int {
@@ -16,99 +35,67 @@ func RandomInt(MAX int, MIN int) int {
 	return rand.Intn(MAX-MIN+1) + MIN
 }
 
-func main() {
-	var NewSudoku Sudoku
-	NewSudoku.grid = make([][]int, 9)
-	NewSudoku.level = 1
-
-	// this sudoku is just for reference used in checking validation logic
-	NewSudoku.grid[0] = []int{1, 5, 8, 2, 7, 6, 4, 9, 3}
-	NewSudoku.grid[1] = []int{3, 6, 7, 1, 4, 9, 8, 5, 2}
-	NewSudoku.grid[2] = []int{2, 4, 9, 3, 8, 5, 6, 1, 7}
-	NewSudoku.grid[3] = []int{6, 1, 4, 7, 3, 8, 9, 2, 5}
-	NewSudoku.grid[4] = []int{5, 8, 3, 9, 2, 1, 7, 6, 4}
-	NewSudoku.grid[5] = []int{7, 9, 2, 6, 5, 4, 1, 3, 8}
-	NewSudoku.grid[6] = []int{8, 2, 1, 5, 6, 7, 3, 4, 9}
-	NewSudoku.grid[7] = []int{9, 7, 5, 4, 1, 3, 2, 8, 6}
-	NewSudoku.grid[8] = []int{4, 3, 6, 8, 9, 2, 5, 7, 1}
-
-	// NewSudoku.grid[0] = []int{1, 5, 0, 2, 7, 0, 4, 9, 3}
-	// NewSudoku.grid[1] = []int{3, 0, 7, 1, 4, 0, 8, 5, 0}
-	// NewSudoku.grid[2] = []int{0, 4, 9, 3, 8, 5, 6, 1, 7}
-	// NewSudoku.grid[3] = []int{6, 1, 4, 7, 3, 8, 0, 2, 5}
-	// NewSudoku.grid[4] = []int{5, 8, 0, 9, 2, 1, 7, 6, 4}
-	// NewSudoku.grid[5] = []int{7, 9, 2, 0, 5, 0, 1, 3, 0}
-	// NewSudoku.grid[6] = []int{0, 2, 1, 5, 6, 7, 3, 4, 9}
-	// NewSudoku.grid[7] = []int{9, 7, 5, 0, 1, 3, 2, 0, 6}
-	// NewSudoku.grid[8] = []int{0, 3, 6, 0, 9, 2, 5, 7, 0}
-
-	//complete grid initialiize to zero
-	for i := 0; i < 9; i++ {
-		for j := 0; j < 9; j++ {
-			NewSudoku.grid[i][j] = 0
+func (NewSudoku *Sudoku)createGrid() {
+	for j:=0; j<9 ; j++ {
+		for i:=0; i<9; i++ {
+			NewSudoku.grid[j] = append(NewSudoku.grid[j],0)
 		}
 	}
-
-	display("initialiize to zero ", NewSudoku.grid)
-	// DiagonalFill(grid)
-	// display("diagonal sudoku  : ", NewSudoku.grid)
-
-	RandomizeSudoku(NewSudoku.grid)
-	display("Random start sudoku  : ", NewSudoku.grid)
-
-	SudokuGenrator(NewSudoku.grid)
-	fmt.Println("Is it valid ? : ", IsSudokuValid(NewSudoku.grid))
-	display("complete sudoku  : ", NewSudoku.grid)
-
-	// according to level fill number of zeroes
-	level := 4
-	LevelWiseSudoku(NewSudoku.grid, level)
-	display("\nL4  sudoku  : ", NewSudoku.grid)
-	fmt.Println("Is it valid ? : ", IsSudokuValid(NewSudoku.grid))
 }
 
-func LevelWiseSudoku(grid [][]int, level int) {
+
+func (NewSudoku *Sudoku) LevelWiseSudoku(level string) {
+	display("level wise grid :", NewSudoku.grid)
+	// NewSudoku.userGrid = NewSudoku.grid
+	grid := make([][]int , 9)
+
+		for i:=0;i<9;i++{
+			for j:=0;j<9;j++{
+				grid[i] = append(grid[i],j)
+			}
+		}
+	for i:=0;i<9;i++{
+		for j:=0;j<9;j++{
+			grid[i][j] = NewSudoku.grid[i][j]
+		}
+	}
+	// copy(grid, NewSudoku.grid)
+	// display("level wise original grid :", NewSudoku.grid)
+	// display("level wise copy grid :", grid)
+	//
 	iteration := 10000
 	itr, blanks := 0, 0
 	switch level {
-	case 1:
-		blanks = RandomInt(15, 8)
-	case 2:
-		blanks = RandomInt(25, 16)
-	case 3:
-		blanks = RandomInt(45, 26)
-	case 4:
-		blanks = RandomInt(55, 46)
-	case 5:
-		blanks = RandomInt(65, 47)
+	case "0":
+		blanks = RandomInt(8, 4)
+	case "1":
+		blanks = RandomInt(40, 20)
+	case "2":
+		blanks = RandomInt(60, 60)
 	}
 	// fmt.Println(blanks)
 	i := 0
 	for i = 0; i < iteration; i++ {
 		row := (RandomInt(7832, 23)*i + iteration*(RandomInt(78, 2))) % 9
 		col := (RandomInt(92812, 187)*i + iteration*(RandomInt(92, 8))) % 9
-
 		if grid[row][col] != 0 {
 			grid[row][col] = 0
 			itr++
 		}
-
 		if itr == blanks {
 			break
 		}
-		// if(blanks > 8  && blanks <= 15 && level == 1) { break
-		// } else if(blanks > 15  && blanks <= 25 && level == 2) { break
-		// } else if(blanks > 25  && blanks <= 45  && level == 3) { break
-		// } else if(blanks > 45  && blanks <= 60  && level == 4 ) { break
-		// } else if(blanks > 60  && blanks <= 75  && level == 5 ) { break }
-
 	}
+	// display("copy zeroes grid : ", grid)
+	// display("original no zeroees grid : ", NewSudoku.grid)
+
+	NewSudoku.userGrid = grid
 	fmt.Println("iertatir : ", i)
 	fmt.Println(" no of blanks : ", blanks)
 }
 
 // random but valid initializations
-func RandomizeSudoku(grid [][]int) {
+func (s *Sudoku) RandomizeSudoku() {
 	val := 0
 	for i := 0; i < 9; i++ {
 		for j := 0; j < 9; j++ {
@@ -118,7 +105,7 @@ func RandomizeSudoku(grid [][]int) {
 			//logic for increase randomization
 			if i == 0 && j == 0 { //00
 				val = (RandomInt(9, 1) * RandomInt(899, 76)) % 10
-				grid[i][j] = val
+				s.grid[i][j] = val
 			}
 			if i == 0 && j != 0 { //00
 				val = (RandomInt(9, 1) * RandomInt(974898, 8765) * j) % 10
@@ -129,8 +116,8 @@ func RandomizeSudoku(grid [][]int) {
 				val = (RandomInt(9, 1) * RandomInt(899, 786) * i * j) % 10
 			}
 			//only assign if valid else skip
-			if !violate(grid, row, col, val) {
-				grid[row][col] = val
+			if !violate(s.grid, row, col, val) {
+				s.grid[row][col] = val
 				// fmt.Println(row, col , val)
 			}
 		}
@@ -138,19 +125,19 @@ func RandomizeSudoku(grid [][]int) {
 }
 
 //backtacking function for sudoku generation
-func SudokuGenrator(grid [][]int) bool {
-	row, col, empty := find_empty(grid)
+func (s *Sudoku) SudokuGenrator() bool {
+	row, col, empty := find_empty(s.grid)
 	if empty == -1 {
 		return true
 	} else {
 		// start := RandomInt(9,1)
 		for i := 1; i <= 9; i++ {
-			if !violate(grid, row, col, i) {
-				grid[row][col] = i
-				if SudokuGenrator(grid) {
+			if !violate(s.grid, row, col, i) {
+				s.grid[row][col] = i
+				if s.SudokuGenrator() {
 					return true
 				}
-				grid[row][col] = 0
+				s.grid[row][col] = 0
 			}
 		}
 	}
@@ -231,6 +218,19 @@ func display(msg string, grid [][]int) {
 	fmt.Println("\n\n")
 }
 
+// For checking if user won or lost
+func (s *Sudoku) checkWin() bool {
+	display("grid : ", s.grid)
+	display("userGrid ", s.userGrid)
+	for i := 0; i < 9; i++ {
+		for j := 0; j < 9; j++ {
+			if s.grid[i][j] != s.userGrid[i][j] {
+				return false
+			}
+		}
+	}
+	return true
+}
 // valid check of complete sudoku
 func IsSudokuValid(grid [][]int) bool {
 	if IsRowAndColumnUnique(grid) && IsSubGridValid(grid) {
@@ -296,3 +296,134 @@ func IsRowAndColumnUnique(grid [][]int) (valid bool) {
 	} //for i
 	return
 }
+
+
+
+// import (
+// )
+
+// var DB_USER =
+
+var upgrader = websocket.Upgrader{}
+
+var DB_USER string = os.Getenv("DATABASE_USERNAME")
+var DB_PASSWORD string = os.Getenv("DATABASE_PASSWORD")
+var DB_NAME string = os.Getenv("DATABASE_NAME")
+
+var difficultLevel = map[string]int{
+	"0": 30,
+	"1": 50,
+	"2": 70,
+}
+// To save score in database
+func saveScore(userTime time.Duration, name string) {
+	hours := int(userTime / time.Hour)
+	minutes := int(userTime / time.Minute)
+	seconds := int(userTime / time.Second)
+	seconds = seconds - minutes*60
+	current := time.Now()
+	date := current.Format("2006-01-02")
+	usertime := strconv.Itoa(hours) + ":" + strconv.Itoa(minutes) + ":" + strconv.Itoa(seconds)
+
+	db, err := sql.Open("mysql", DB_USER+":"+DB_PASSWORD+"@tcp(127.0.0.1:3306)/"+DB_NAME)
+
+	if err != nil {
+		panic(err.Error())
+	}
+	defer db.Close()
+
+	sql := "INSERT INTO Scores(Name, Time, Date) VALUES (?,?,?)"
+
+	insert, err := db.Query(sql, name, usertime, date)
+
+	if err != nil {
+		panic(err.Error())
+	}
+	defer insert.Close()
+}
+
+type Score struct {
+	Name string `json:"Name"`
+	Time string `json:"Time"`
+}
+
+func getTopScores() string {
+	var top []Score
+	db, err := sql.Open("mysql", DB_USER+":"+DB_PASSWORD+"@tcp(127.0.0.1:3306)/"+DB_NAME)
+
+	// if there is an error opening the connection, handle it
+	if err != nil {
+		log.Print(err.Error())
+	}
+	defer db.Close()
+
+	results, err := db.Query("SELECT Name, Time FROM Scores Order by Time LIMIT 5")
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+	for results.Next() {
+		var tag Score
+		// for each row, scan the result into our tag composite object
+		err = results.Scan(&tag.Name, &tag.Time)
+		if err != nil {
+			panic(err.Error()) // proper error handling instead of panic in your app
+		}
+		top = append(top, tag)
+	}
+	jsonData, err := json.Marshal(top)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	return string(jsonData)
+}
+
+// func main() {
+	// 	var NewSudoku Sudoku
+	// 	NewSudoku.grid = make([][]int, 9)
+	// 	NewSudoku.level = 1
+	//
+	// 	// this sudoku is just for reference used in checking validation logic
+	// NewSudoku.grid[0] = []int{1, 5, 8, 2, 7, 6, 4, 9, 3}
+	// NewSudoku.grid[1] = []int{3, 6, 7, 1, 4, 9, 8, 5, 2}
+	// NewSudoku.grid[2] = []int{2, 4, 9, 3, 8, 5, 6, 1, 7}
+	// NewSudoku.grid[3] = []int{6, 1, 4, 7, 3, 8, 9, 2, 5}
+	// NewSudoku.grid[4] = []int{5, 8, 3, 9, 2, 1, 7, 6, 4}
+	// NewSudoku.grid[5] = []int{7, 9, 2, 6, 5, 4, 1, 3, 8}
+	// NewSudoku.grid[6] = []int{8, 2, 1, 5, 6, 7, 3, 4, 9}
+	// NewSudoku.grid[7] = []int{9, 7, 5, 4, 1, 3, 2, 8, 6}
+	// NewSudoku.grid[8] = []int{4, 3, 6, 8, 9, 2, 5, 7, 1}
+	//
+	// 	// NewSudoku.grid[0] = []int{1, 5, 0, 2, 7, 0, 4, 9, 3}
+	// 	// NewSudoku.grid[1] = []int{3, 0, 7, 1, 4, 0, 8, 5, 0}
+	// 	// NewSudoku.grid[2] = []int{0, 4, 9, 3, 8, 5, 6, 1, 7}
+	// 	// NewSudoku.grid[3] = []int{6, 1, 4, 7, 3, 8, 0, 2, 5}
+	// 	// NewSudoku.grid[4] = []int{5, 8, 0, 9, 2, 1, 7, 6, 4}
+	// 	// NewSudoku.grid[5] = []int{7, 9, 2, 0, 5, 0, 1, 3, 0}
+	// 	// NewSudoku.grid[6] = []int{0, 2, 1, 5, 6, 7, 3, 4, 9}
+	// 	// NewSudoku.grid[7] = []int{9, 7, 5, 0, 1, 3, 2, 0, 6}
+	// 	// NewSudoku.grid[8] = []int{0, 3, 6, 0, 9, 2, 5, 7, 0}
+	//
+	// 	//complete grid initialiize to zero
+	// 	for i := 0; i < 9; i++ {
+		// 		for j := 0; j < 9; j++ {
+			// 			NewSudoku.grid[i][j] = 0
+			// 		}
+			// 	}
+			//
+			// 	display("initialiize to zero ", NewSudoku.grid)
+			// 	// DiagonalFill(grid)
+			// 	// display("diagonal sudoku  : ", NewSudoku.grid)
+			//
+			// 	RandomizeSudoku(NewSudoku.grid)
+			// 	display("Random start sudoku  : ", NewSudoku.grid)
+			//
+			// 	SudokuGenrator(NewSudoku.grid)
+			// 	fmt.Println("Is it valid ? : ", IsSudokuValid(NewSudoku.grid))
+			// 	display("complete sudoku  : ", NewSudoku.grid)
+			//
+			// 	// according to level fill number of zeroes
+			// 	level := 4
+			// 	LevelWiseSudoku(NewSudoku.grid, level)
+			// 	display("\nL4  sudoku  : ", NewSudoku.grid)
+			// 	fmt.Println("Is it valid ? : ", IsSudokuValid(NewSudoku.grid))
+			// }
